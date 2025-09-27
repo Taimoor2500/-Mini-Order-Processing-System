@@ -1,6 +1,7 @@
 # app/db/models/order.py
 import enum
 from sqlalchemy import Column, Integer, String, DateTime, Enum, Index
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.session import Base
 
@@ -21,6 +22,12 @@ class Order(Base):
     status = Column(String, default="pending")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    items = relationship(
+        "OrderItem",
+        back_populates="order",
+        cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("uq_order_vendor", "order_id", "vendor_id", unique=True),
