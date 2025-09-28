@@ -6,9 +6,9 @@ from sqlalchemy.sql import func
 from app.db.session import Base
 
 class OrderPriority(enum.Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
 
 class Order(Base):
     __tablename__ = "orders"

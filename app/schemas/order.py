@@ -5,9 +5,9 @@ from enum import Enum
 from .vendor import VendorResponse
 
 class OrderPriority(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
 
 
 
@@ -21,7 +21,7 @@ class OrderItemResponse(BaseModel):
     quantity: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class OrderCreate(BaseModel):
@@ -62,7 +62,7 @@ class OrderResponse(BaseModel):
     postal_code: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class OrderSummaryResponse(BaseModel):
