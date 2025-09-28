@@ -1,15 +1,17 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 from app.db.session import get_db
 from app.db.models.order import Order
 from app.db.models.order_item import OrderItem
 from app.db.models.vendor import Vendor
-from app.schemas.order import OrderCreate, OrderResponse, OrderPriority, OrderSummaryResponse
+from app.schemas.order import OrderCreate, OrderResponse, OrderPriority, OrderSummaryResponse, PaginatedOrderResponse
 from app.background.order_processing import process_order_background, process_high_priority_order
-from typing import List, Optional
-from datetime import datetime
+from typing import List, Optional, Union
+from datetime import datetime, date, time
 from fastapi import Query
+from fastapi_pagination import Page, Params
+from fastapi_pagination.ext.sqlalchemy import paginate
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -65,31 +67,46 @@ def create_order(order: OrderCreate, background_tasks: BackgroundTasks, db: Sess
 
     return new_order
 
-@router.get("/{vendor_id}", response_model=List[OrderResponse])
-def get_orders(vendor_id: int, start_date: Optional[datetime] = Query(None), end_date: Optional[datetime] = Query(None), priority: Optional[OrderPriority] = Query(None), db: Session = Depends(get_db)):
-
+@router.get("/{vendor_id}", response_model=Union[List[OrderResponse], PaginatedOrderResponse])
+def get_orders(vendor_id: int, start_date: Optional[date] = Query(None, description="Start date (YYYY-MM-DD)"), end_date: Optional[date] = Query(None, description="End date (YYYY-MM-DD)"), priority: Optional[OrderPriority] = Query(None),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(50, ge=1, le=100, description="Page size"), 
+    db: Session = Depends(get_db)
+):
     query = db.query(Order).filter(Order.vendor_id == vendor_id)
 
     if start_date:
-        query = query.filter(Order.created_at >= start_date)
+        start_datetime = datetime.combine(start_date, time.min)
+        query = query.filter(Order.created_at >= start_datetime)
     if end_date:
-        query = query.filter(Order.created_at <= end_date)
+        end_datetime = datetime.combine(end_date, time.max)
+        query = query.filter(Order.created_at <= end_datetime)
 
     if priority:
         query = query.filter(Order.priority == priority)
 
-    orders = query.all()
-
-    if not orders:
+    total_count = query.count()
+    
+    if total_count == 0:
         raise HTTPException(status_code=404, detail="No orders found for this vendor")
 
-    priority_order = {"HIGH": 1, "MEDIUM": 2, "LOW": 3}
-    orders_sorted = sorted(
-        orders,
-        key=lambda o: (priority_order[o.priority.value], o.created_at)
+    query = query.order_by(
+        case(
+            (Order.priority == OrderPriority.HIGH, 1),
+            (Order.priority == OrderPriority.MEDIUM, 2),
+            (Order.priority == OrderPriority.LOW, 3),
+            else_=4
+        ),
+        Order.created_at
     )
 
-    return orders_sorted
+    if total_count > 50:
+        params = Params(page=page, size=size)
+        paginated_result = paginate(query, params)
+        return paginated_result
+    else:
+        orders = query.all()
+        return orders
 
 @router.get("/status/{order_id}")
 def get_order_status(order_id: str, db: Session = Depends(get_db)):

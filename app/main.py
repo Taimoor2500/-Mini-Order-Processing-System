@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_pagination import add_pagination
 
 from app.db.session import engine, Base, SessionLocal
 from app.db.models import Order
@@ -18,6 +19,8 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 app.include_router(orders.router)
+
+add_pagination(app)
 
 @app.get("/")
 def read_root():

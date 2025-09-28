@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel, conint, validator
 from enum import Enum
 from .vendor import VendorResponse
+from fastapi_pagination import Page
 
 class OrderPriority(str, Enum):
     LOW = "LOW"
@@ -69,3 +70,7 @@ class OrderSummaryResponse(BaseModel):
     total_orders: int
     total_items: int
     total_priority_orders: int
+
+
+class PaginatedOrderResponse(Page[OrderResponse]):
+    pass
