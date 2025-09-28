@@ -10,6 +10,13 @@ class OrderPriority(enum.Enum):
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
 
+class OrderStatus(enum.Enum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    PROCESSED = "PROCESSED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
 class Order(Base):
     __tablename__ = "orders"
 
@@ -17,7 +24,7 @@ class Order(Base):
     order_id = Column(String, nullable=False)
     vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="CASCADE"), nullable=False)
     priority = Column(Enum(OrderPriority), default=OrderPriority.LOW, nullable=False)
-    status = Column(String, default="pending")
+    status = Column(Enum(OrderStatus), default=OrderStatus.PENDING, nullable=False)
     address = Column(String, nullable=False)
     city = Column(String, nullable=False)
     state = Column(String, nullable=False)
@@ -37,5 +44,6 @@ class Order(Base):
         Index("uq_order_vendor", "order_id", "vendor_id", unique=True),
         Index("ix_vendor_id", "vendor_id"),
         Index("ix_priority", "priority"),
+        Index("ix_status", "status"),
         Index("ix_created_at", "created_at"),
     )
