@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.db.session import get_db
@@ -6,15 +6,20 @@ from app.db.models.order import Order
 from app.db.models.order_item import OrderItem
 from app.db.models.vendor import Vendor
 from app.schemas.order import OrderCreate, OrderResponse, OrderPriority, OrderSummaryResponse
+from app.background.order_processing import process_order_background, process_high_priority_order
 from typing import List, Optional
 from datetime import datetime
 from fastapi import Query
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 @router.post("/", response_model=OrderResponse)
-def create_order(order: OrderCreate, db: Session = Depends(get_db)):
-
+def create_order(order: OrderCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    
     vendor = db.query(Vendor).filter(Vendor.id == order.vendor_id).first()
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
@@ -27,7 +32,6 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     if existing_order:
         raise HTTPException(status_code=409, detail="Duplicate order for this vendor")
 
-
     new_order = Order(
         order_id=order.order_id,
         vendor_id=order.vendor_id,
@@ -38,7 +42,6 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
         postal_code=order.postal_code
     )
 
- 
     for item in order.items:
         if item.quantity <= 0:
             raise HTTPException(status_code=400, detail=f"Quantity must be >0 for item {item.item_name}")
@@ -49,15 +52,21 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
         )
         new_order.items.append(new_item)
 
-  
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
 
+    if order.priority == OrderPriority.HIGH:
+        background_tasks.add_task(process_high_priority_order, new_order.id)
+        logger.info(f"Queued HIGH PRIORITY order {new_order.order_id} (ID: {new_order.id}) for processing")
+    else:
+        background_tasks.add_task(process_order_background, new_order.id)
+        logger.info(f"📋 Queued order {new_order.order_id} (ID: {new_order.id}) for background processing")
+
     return new_order
 
 @router.get("/{vendor_id}", response_model=List[OrderResponse])
-def get_orders( vendor_id: int,  start_date: Optional[datetime] = Query(None), end_date: Optional[datetime] = Query(None), priority: Optional[OrderPriority] = Query(None), db: Session = Depends(get_db)):
+def get_orders(vendor_id: int, start_date: Optional[datetime] = Query(None), end_date: Optional[datetime] = Query(None), priority: Optional[OrderPriority] = Query(None), db: Session = Depends(get_db)):
 
     query = db.query(Order).filter(Order.vendor_id == vendor_id)
 
@@ -94,7 +103,7 @@ def get_order_status(order_id: str, db: Session = Depends(get_db)):
         "order_id": order.order_id,
         "status": order.status,
         "updated_at": order.updated_at
-    } 
+    }
 
 @router.get("/summary/{vendor_id}", response_model=OrderSummaryResponse)
 def get_order_summary(vendor_id: int, db: Session = Depends(get_db)):
