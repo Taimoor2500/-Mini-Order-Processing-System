@@ -18,3 +18,4 @@ typing_extensions==4.15.0
 uvicorn==0.37.0
 fastapi-pagination==0.12.21
 slowapi==0.1.9
+requests==2.31.0
