@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 from app.db.session import get_db
@@ -7,6 +7,7 @@ from app.db.models.order_item import OrderItem
 from app.db.models.vendor import Vendor
 from app.schemas.order import OrderCreate, OrderResponse, OrderPriority, OrderSummaryResponse, PaginatedOrderResponse
 from app.background.order_processing import process_order_background, process_high_priority_order
+from app.utils.rate_limiter import vendor_rate_limit
 from typing import List, Optional, Union
 from datetime import datetime, date, time
 from fastapi import Query
@@ -20,7 +21,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 @router.post("/", response_model=OrderResponse)
-def create_order(order: OrderCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+@vendor_rate_limit("5/minute")
+def create_order(order: OrderCreate, background_tasks: BackgroundTasks, request: Request, db: Session = Depends(get_db)):
     
     vendor = db.query(Vendor).filter(Vendor.id == order.vendor_id).first()
     if not vendor:
