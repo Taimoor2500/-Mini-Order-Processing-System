@@ -6,7 +6,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.db.session import engine, Base, SessionLocal
 from app.db.models import Order
-from app.api import orders
+from app.api import orders, vendors
 from app.utils.rate_limiter import limiter
 
 app = FastAPI(title="Order Processing", version="1.0")
@@ -25,6 +25,7 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 app.include_router(orders.router)
+app.include_router(vendors.router)
 
 add_pagination(app)
 
