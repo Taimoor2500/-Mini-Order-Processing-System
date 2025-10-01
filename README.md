@@ -75,6 +75,9 @@ A robust, scalable FastAPI-based order processing system designed for handling v
 ```
 http://localhost:8000
 ```
+```
+mini-order-processing-system-production.up.railway.app
+```
 
 ### Authentication
 Currently, the API does not require authentication. Rate limiting is applied per vendor.
